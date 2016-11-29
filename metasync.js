@@ -101,185 +101,46 @@ metasync.sequential = function(fns, done, data) {
 };
 
 // Data Collector
-//   expected - number of collect() calls expected
-//   timeout - collect timeout (optional)
+//   expected - number of `collect()` calls expected
+//   done - on `done` callback(data)
 //
-metasync.DataCollector = function(expected, timeout) {
+metasync.DataCollector = function(expected, done) {
   this.expected = expected;
-  this.timeout = timeout;
-  this.count = 0;
   this.data = {};
-  this.errs = [];
-  this.events = {
-    error: null,
-    timeout: null,
-    done: null
-  };
-  var collector = this;
-  if (this.timeout) {
-    this.timer = setTimeout(function() {
-      var err = new Error('DataCollector timeout');
-      collector.emit('timeout', err, collector.data);
-    }, timeout);
-  }
+  this.count = 0;
+  this.done = done;
 };
 
 // Push data to collector
 //   key - key in result data
-//   data - value or error instance
+//   data - value in result data
 //
 metasync.DataCollector.prototype.collect = function(key, data) {
   this.count++;
-  if (data instanceof Error) {
-    this.errs[key] = data;
-    this.emit('error', data, key);
-  } else {
-    this.data[key] = data;
-  }
-  if (this.expected === this.count) {
-    if (this.timer) {
-      this.timer.clearTimeout(this.timer);
-    }
-    var errs = this.errs.length ? this.errs : null;
-    this.emit('done', errs, this.data);
-  }
-};
-
-// DataCollector events:
-//   on('error', function(err, key))
-//   on('timeout', function(err, data))
-//   on('done', function(errs, data))
-//     errs - hash of errors
-//     data - hash of sucessfully received adta
-//
-metasync.DataCollector.prototype.on = function(eventName, callback) {
-  if (eventName in this.events) {
-    this.events[eventName] = callback;
-  }
-};
-
-// Emit DataCollector events
-//
-metasync.DataCollector.prototype.emit = function(eventName, err, data) {
-  var event = this.events[eventName];
-  if (event) event(err, data);
+  this.data[key] = data;
+  if (this.expected === this.count) this.done(this.data);
 };
 
 // Key Collector
-//   expected - array of keys, example: ['config', 'users', 'cities']
-//   timeout - collect timeout (optional)
-//
-metasync.KeyCollector = function(expected, timeout) {
-  this.isDone = false;
+// keys - array of keys
+// done - on `done` callback(data)
+metasync.KeyCollector = function(keys, done){
+  this.keys = keys;
+  this.data = [];
+  this.done = done;
 };
 
-metasync.KeyCollector.prototype.collect = function(key, data) {
-};
-
-metasync.KeyCollector.prototype.stop = function(isDone) {
-};
-
-metasync.KeyCollector.prototype.pause = function() {
-};
-
-metasync.KeyCollector.prototype.resume = function() {
-};
-
-// KeyCollector events:
-//   on('error', function(err, key))
-//   on('timeout', function(err, data))
-//   on('done', function(errs, data))
-//   on('pause', function())
-//   on('resume', function())
-//
-metasync.KeyCollector.prototype.on = function(eventName, callback) {
-  if (eventName in this.events) {
-    this.events[eventName] = callback;
+// Push data to collector
+//   key - key in result data
+//   data - value in result data
+metasync.KeyCollector.prototype.collect = function(key, data){
+  if (this.keys.includes(key)){
+    this.data[key] = data;
+    console.log(data);
+    this.keys.splice(this.data.indexOf(key),this.data.indexOf(key)+1);
   }
-};
-
-// ConcurrentQueue
-//   concurrency - number of simultaneous and asynchronously executing tasks
-//   timeout - process timeout (optional), for single item
-//
-metasync.ConcurrentQueue = function(concurrency, timeout) {
-  this.concurrency = concurrency;
-  this.timeout = timeout;
-  this.count = 0;
-  this.items = [];
-  this.events = {
-    error: null,
-    timeout: null,
-    empty: null,
-    process: null
-  };
-};
-
-// Add item to queue
-//
-metasync.ConcurrentQueue.prototype.add = function(item) {
-  if (this.count < this.concurrency) {
-    this.next(item);
-  } else {
-    this.items.push(item);
-  }
-};
-
-// Get next item from queue
-//
-metasync.ConcurrentQueue.prototype.next = function(item) {
-  var queue = this;
-  queue.count++;
-  if (queue.timeout) {
-    var timer = setTimeout(function() {
-      var err = new Error('ConcurrentQueue timeout');
-      queue.emit('timeout', err);
-    }, queue.timeout);
-  }
-  var fn = queue.events.process || function(item, callback) {
-    callback();
-  };
-  fn(item, function() {
-    queue.count--;
-    if (queue.timeout) {
-      clearTimeout(timer);
-    }
-    if (queue.items.length > 0) {
-      var item = queue.items.shift();
-      queue.next(item);
-    } else if (queue.count === 0) {
-      queue.emit('empty');
-    }
-  });
-};
-
-// ConcurrentQueue events:
-//   on('error', function(err))
-//   on('empty', function()) - no more items in queue
-//   on('process', function(item, callback)) - process item function
-//   on('timeout', function(err, data))
-//
-metasync.ConcurrentQueue.prototype.on = function(eventName, fn) {
-  if (eventName in this.events) {
-    this.events[eventName] = fn;
-  }
-};
-
-// Emit DataCollector events
-//
-metasync.ConcurrentQueue.prototype.emit = function(eventName, err, data) {
-  var event = this.events[eventName];
-  if (event) event(err, data);
-};
-
-metasync.ConcurrentQueue.prototype.pause = function() {
-};
-
-metasync.ConcurrentQueue.prototype.resume = function() {
-};
-
-metasync.ConcurrentQueue.prototype.stop = function() {
-};
+  if (this.keys.length < 1) this.done(this.data);
+}
 
 // Asynchrous filter (iterate parallel)
 // filter :: [a] -> (a -> (Boolean -> Void) -> Void) -> ([a] -> Void)
@@ -415,12 +276,13 @@ metasync.each = function(items, fn, done) {
   }
 };
 
+
 // Asyncronous reduce
 //   items - incoming array
 //   callback - function to be executed for each value in the array
 //     previous - value previously returned in the last iteration
 //     current - current element being processed in the array
-//     callback - callback for returning value back to function reduce
+//     response - callback for returning value back to function reduce
 //     counter - the index of the current element being processed in the array
 //     items - the array reduce was called upon
 //   done - callback function on done
@@ -445,16 +307,4 @@ metasync.reduce = function(items, callback, done, initial) {
   }
 
   callback(previous, current, response, counter, items);
-};
-
-// Asyncronous map
-//   items - incoming array
-//   callback - function to be executed for each value in the array
-//     current - current element being processed in the array
-//     callback - callback for returning value back to function map
-//   done - callback function on done
-//     err - error or null
-//     data - result if !err
-//
-metasync.map = function(items, callback, done) {
-};
+}
