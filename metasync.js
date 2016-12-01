@@ -126,7 +126,8 @@ metasync.DataCollector.prototype.collect = function(key, data) {
 // done - on `done` callback(data)
 metasync.KeyCollector = function(keys, done){
   this.keys = keys;
-  this.data = [];
+  this.count = 0;
+  this.data = {};
   this.done = done;
 };
 
@@ -135,11 +136,10 @@ metasync.KeyCollector = function(keys, done){
 //   data - value in result data
 metasync.KeyCollector.prototype.collect = function(key, data){
   if (this.keys.includes(key)){
-    this.data[key] = data;
-    console.log(data);
-    this.keys.splice(this.data.indexOf(key),this.data.indexOf(key)+1);
+  	this.count++;
+    this.data = {key , data};
   }
-  if (this.keys.length < 1) this.done(this.data);
+  if (this.count === this.keys.length) this.done(this.data);
 }
 
 // Asynchrous filter (iterate parallel)
