@@ -124,7 +124,7 @@ metasync.DataCollector.prototype.collect = function(key, data) {
 // Key Collector
 // keys - array of keys
 // done - on `done` callback(data)
-metasync.KeyCollector = function(keys, done){
+metasync.KeyCollector = function(keys, done) {
   this.keys = keys;
   this.count = 0;
   this.data = {};
@@ -134,10 +134,10 @@ metasync.KeyCollector = function(keys, done){
 // Push data to collector
 //   key - key in result data
 //   data - value in result data
-metasync.KeyCollector.prototype.collect = function(key, data){
-  if (this.keys.includes(key)){
-  	this.count++;
-    this.data = {key , data};
+metasync.KeyCollector.prototype.collect = function(key, data) {
+  if (this.keys.includes(key)) {
+    this.count++;
+    this.data = { key, data };
   }
   if (this.count === this.keys.length) this.done(this.data);
 }
